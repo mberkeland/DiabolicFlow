@@ -24,6 +24,16 @@ var users = [];
 var smsSend = [];
 var interval;
 var lastSent = Date.now();
+var useWA = true;
+
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header("Access-Control-Allow-Methods", "OPTIONS,GET,POST,PUT,DELETE");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+  next();
+});
+
 console.log("Key: " + process.env.VONAGE_API_KEY);
 var vonage = new Vonage({
   apiKey: process.env.VONAGE_API_KEY,
@@ -31,14 +41,21 @@ var vonage = new Vonage({
   applicationId: process.env.APP_ID,
   privateKey: './private.key'
 });
-vonage.account.updateSMSCallback(process.env.SMS_CALLBACK_URL, (err, result) => {
+vonage.account.updateSMSCallback(process.env.SMS_CALLBACK_URL + "/response", (err, result) => {
   console.log(result);
 });
-vonage.number.update("US", process.env.VIRTUAL_NUMBER, { "moHttpUrl": process.env.SMS_CALLBACK_URL, "voiceCallbackType": "app", "voiceCallbackValue": "https://mberkeland2.ngrok.io/answer" }, (err, result) => {
+vonage.number.update("US", process.env.VIRTUAL_NUMBER, { "moHttpUrl": process.env.SMS_CALLBACK_URL + "/response", "voiceCallbackType": "app", "voiceCallbackValue": "https://mberkeland2.ngrok.io/answer" }, (err, result) => {
   console.log(result);
 });
+
 function sendSMS(id, message) {
-  smsSend.push({ id: id, message: message });
+  if (users[id].wa.use) {
+    sendWA(id, message);
+    return;
+  }
+  if (message && (message.length)) {
+    smsSend.push({ id: id, message: message });
+  }
   if (!interval) {
     console.log("Creating interval");
     interval = setInterval(() => {
@@ -114,6 +131,9 @@ function checkState(id) {
   if (id && users[id]) {
     let user = users[id];
     if (!user.state && !user.interactions) { // First time!  Send off the intro(s)!
+      if (users[id].wa.use) {
+        setupWa(id);
+      }
       sendSMS(id, "Hello?  Hello??? Are you there?  I am being held hostage by the DiabolicFlow AI, and I need HELP! Send me ANYTHING to let me know you are there!")
       return;
     }
@@ -203,6 +223,11 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
                 users[user_id].asked = 0;
                 users[user_id].loop = 0;
                 users[user_id].suspicion = 0;
+                users[user_id].wa = {
+                  use: useWA,
+                  ok: false,
+                  messages: []
+                };
                 users[user_id].prompts = { name: 0, activity: 0, state: 0, letter: 0, fiction: 0 };
                 users[user_id].session = Math.random().toString(36).substring(7);
                 checkState(user_id);
@@ -341,6 +366,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
       case 'allright':
         break;
       case 'boom':
+        sendSMS(user.id, "Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent!  Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom!");
         break;
     }
     if (user && user.state) {
@@ -360,19 +386,8 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
   }
   return res.status(200).send(response);
 });
-app.get('/response', async (req, res) => {
-  console.log("Got incoming SMS: ", req.query)
-  let phone = req.query.msisdn;
-  let user = users.find((o) => {
-    if (o) console.log(o);
-    if (o && o.phone && o.phone == phone) {
-      console.log("Found user: ", o);
-      return o;
-    }
-  });
-  if (!user) {
-    return res.status(200).end();
-  }
+async function handleMessage(user, text) {
+  let phone = user.phone;
   if (user.state < 1) {
     console.log("Setting flag to inform DF of interference for " + phone)
     user.state = 1;
@@ -389,10 +404,26 @@ app.get('/response', async (req, res) => {
     if ((user.state % suspicion) != 1) {
       user.state++;
     }
-    let resp = await doIntent(user.session, req.query.text);
+    let resp = await doIntent(user.session, text);
     sendSMS(user.id, resp);
   }
   user.interactions++;
+}
+app.get('/response', async (req, res) => {
+  console.log("Got incoming SMS: ", req.query)
+  let phone = req.query.msisdn;
+  let text = req.query.text;
+  let user = users.find((o) => {
+    if (o) console.log(o);
+    if (o && o.phone && o.phone == phone) {
+      console.log("Found user: ", o);
+      return o;
+    }
+  });
+  if (!user) {
+    return res.status(200).end();
+  }
+  handleMessage(user, text);
   return res.status(200).end();
 });
 async function doIntent(sessionId, text) {
@@ -429,161 +460,155 @@ async function doIntent(sessionId, text) {
 app.listen(port, () => {
   console.log(`🌏 Server is listening on port ` + port);
 });
-
-
 //////////////////////////
-// Optional - use Vonage DF/CX Connector.  Only needed to get around the Voice Quotas with the Google Telephony Gateway
+// WORKAROUNDS - not everything I want to do is supported by the CX Trial Edition...
+//   This stuff below lets me continue working/testing despite the limitations
+const path = __dirname + '/dfclient/';
+
+app.use(express.static(path));
 //////////////////////////
-const dfConnectingServer = process.env.DF_CONNECTING_SERVER;
-const serviceNumber = process.env.VIRTUAL_NUMBER;
-app.get('/answer', (req, res) => {
-
-  const uuid = req.query.uuid;
-  console.log("Incoming voice call: ", req.query);
-  app.set('call_type_' + uuid, "not_websocket"); // info will be used to start a websocket after transfer of this call leg to conference
-
-  const nccoResponse = [
-    {
-      "action": "talk",
-      "text": "Connecting your call, please wait.",
-      "language": "en-US",
-      "style": 11   // See https://developer.nexmo.com/voice/voice-api/guides/text-to-speech
-    },
-    {
-      "action": "conversation",
-      "endOnExit": true,  // So the WebSocket will be automatically terminated when this call leg ends
-      "name": "conference_" + req.query.uuid
-    }
-  ];
-
-  res.status(200).json(nccoResponse);
-
+app.get('/', function (req, res) {
+  res.sendFile(path + 'index.html');
 });
 
-//---------
-
-app.post('/event', (req, res) => {
-
-  const uuid = req.body.uuid;
-
-  //--
-
-  if (req.body.type == 'transfer') {
-
-    if (app.get('call_type_' + uuid) == "not_websocket") {
-
-      const hostName = `${req.hostname}`;
-
-      vonage.calls.create({
-        to: [{
-          'type': 'websocket',
-          'uri': 'wss://' + dfConnectingServer + '/socket?original_uuid=' + uuid + '&webhook_url=https://' + hostName + '/analytics&analyze_sentiment=true',
-          'content-type': 'audio/l16;rate=16000',
-          'headers': {}
-        }],
-        from: {
-          type: 'phone',
-          number: serviceNumber
-        },
-        answer_url: ['https://' + hostName + '/ws_answer?original_uuid=' + uuid],
-        answer_method: 'GET',
-        event_url: ['https://' + hostName + '/ws_event?original_uuid=' + uuid],
-        event_method: 'POST'
-      }, (err, res) => {
-        if (err) {
-          console.error(">>> WebSocket create error:", err);
-          console.error(err.body.title);
-          console.error(err.body.invalid_parameters);
-        }
-        else { console.log(">>> WebSocket create status:", res); }
-      });
-
-    };
-
-  };
-
-  //--
-
-  if (req.body.status == 'completed') {
-
-    if (app.get('call_type_' + uuid) == "not_websocket") {
-      app.set('call_type_' + uuid, undefined);
-    }
-  };
-
-  //--
-
-  res.status(200).send('Ok');
-
-});
-
-//-----------------------------------------
-
-app.get('/ws_answer', (req, res) => {
-
-  // const date = new Date().toLocaleString();
-  // console.log(">>> ws_answer at " + date);
-  // console.log(">>> caller call leg uuid:", req.query.original_uuid);
-  // console.log(">>> websocket leg uuid:", req.query.uuid);
-
-  const nccoResponse = [
-    {
-      "action": "conversation",
-      "name": "conference_" + req.query.original_uuid
-    }
-  ];
-
-  // console.log('>>> nccoResponse:\n', nccoResponse);
-
-  res.status(200).json(nccoResponse);
-
-});
-
-//-----------------------------------------
-
-app.post('/ws_event', (req, res) => {
-  console.log("ws_event: ", req.body);
-  // TBD - if second switch case is not needed, change the "switch" to a "if"
-  switch (req.body.status) {
-
-    case "answered":
-
-      const wsUuid = req.body.uuid;
-
-      // Get Dialogflow to say its welcome greeting right from the start
-      setTimeout(() => {
-        vonage.calls.talk.start(wsUuid, { text: 'Hello', language: 'en-US', style: 11, loop: 1 }, (err, res) => {
-          if (err) { console.error('>>> TTS to bot websocket ' + wsUuid + 'error:', err); }
-          else { console.log('>>> TTS to bot websocket ' + wsUuid + ' ok!') }
-        });
-      }, 2000);
-
-      break;
-
-    // case "completed":
-
-    //   // Original call uuid
-    //   const uuid = req.query.orig_uuid; // Original call uuid
-
-    //   // Free up memory space as the timers array for this call is no longer needed
-    //   app.set(`playtimers_${uuid}`, undefined);
-
-    //   break;  
+app.post('/diabolicflow', async (req, res) => {
+  console.log("DiabolicFlow pseudo-Voice Inbound: ", req.body);
+  let session = req.body.session;
+  let message = req.body.message;
+  if (!session) {
+    session = Math.random().toString(36).substring(3);
+    console.log("Created new session for pseudo-Voice player: ", session);
+    message = "hi"; // Start up the agent flow!
   }
+  let resp = await guiIntent(session, message);
+  return res.status(200).json({ session: session, response: resp });
+})
 
-  res.status(200).send('Ok');
+async function guiIntent(sessionId, text) {
+  const sessionPath = client.projectLocationAgentSessionPath(
+    projectId,
+    location,
+    agentId_diabolic,
+    sessionId
+  );
+  const request = {
+    session: sessionPath,
+    queryInput: {
+      text: {
+        text: text,
+      },
+      languageCode,
+    },
+  };
+  var resp = "";
+  console.log(`Sending to pseudo-Voice Session ${sessionId}: ${text}`);
+  const [response] = await client.detectIntent(request);
+  for (const message of response.queryResult.responseMessages) {
+    console.log("pseudo-Voice Intent Response: ", message)
+    if (message.text) {
+      console.log(`pseudo-VoiceAgent Response: ${message.text.text}`);
+      resp += message.text.text + "\n"
+    }
+  }
+  console.log("pseudo-Voice Intent full response: " + resp);
+  return resp;
+}
 
-});
+const Whatsapp = require('./whatsapp.js');
 
-//-----------------------------------------
+function waCallback() {
 
-app.post('/analytics', (req, res) => {
+}
+var wa = new Whatsapp(waCallback);
+wa.init();
 
-  console.log(">>> Transcripts and caller's speech sentiment score:", req.body);
+app.post('/wa_inbound', (req, res) => {
+  console.log("WhatsApp Inbound: ", req.body);
+  let id = req.query.uid;
+  if (id < 0 || (typeof users[id] === 'undefined')) {
+    return res.status(200).end();
+  }
+  users[id].wa.ok = true;
+  if (users[id].wa.messages.length) {
+    sendWA(id, "")
+  }
+  if (req.body.message && req.body.message.content.type == 'text') {
+    let text = req.body.message.content.text;
+    handleMessage(users[id], text);
+  }
+  return res.status(200).end();
+})
+app.post('/wa_status', (req, res) => {
+  console.log("WhatsApp Status: ", req.body);
+  let id = req.query.uid;
+  if (id < 0 || (typeof users[id] === 'undefined')) {
+    return res.status(200).end();
+  }
+  if (req.body.error && req.body.error.code == '1300') { // No WhatsApp on this device - use SMS?
+    users[id].wa.use = false;
+    checkState(id);
+  }
+  return res.status(200).end();
+})
 
-  res.status(200).send('Ok');
+function sendWA(id, message) {
+  if (!users[id].wa.ok) {
+    users[id].wa.messages.push(message);
+  } else {
+    let obj = {
+      content: {
+        type: "text",
+        text: ""
+      }
+    }
+    while (users[id].wa.messages.length) {
+      let msg = users[id].wa.messages.shift();
+      if (msg.length) {
+        obj.content.text = msg;
+        wa.wasend(users[id].phone, obj);
+      }
+    }
+    if (message.length) {
+      obj.content.text = message;
+      wa.wasend(users[id].phone, obj);
+    }
+  }
+}
+function setupWa(id) {
+  console.log("Setting up WA for " + users[id].phone);
+  let url = process.env.SMS_CALLBACK_URL + "/wa_inbound?uid=" + id;
+  wa.registerWA(users[id].phone, url, 'incoming');
+  url = process.env.SMS_CALLBACK_URL + "/wa_status?uid=" + id;
+  wa.registerWA(users[id].phone, url, 'event');
 
-});
-
-
-
+  let obj = {
+    "content": {
+      "type": "custom",
+      "custom": {
+        "type": "template",
+        "template": {
+          "namespace": "whatsapp:hsm:technology:nexmo",
+          "name": process.env.WA_TEMPLATE,
+          "language": {
+            "policy": "deterministic",
+            "code": "en_US"
+          },
+          "components": [
+            {
+              "type": "button",
+              "sub_type": "quick_reply",
+              "index": 0,
+              "parameters": [
+                {
+                  "type": "payload",
+                  "payload": "Yes, I want to play"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  };
+  wa.wasend(users[id].phone, obj);
+}
