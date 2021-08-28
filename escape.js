@@ -473,7 +473,9 @@ const path = __dirname + '/dfclient/';
 app.use(express.static(path));
 //////////////////////////
 app.get('/', function (req, res) {
-  res.sendFile(path + 'index.html');
+  var url = 'https://vids.vonage.com/diabolic';
+  console.log("Redirecting to: " + url);
+  res.status(301).redirect(url);
 });
 
 app.post('/diabolicflow', async (req, res) => {

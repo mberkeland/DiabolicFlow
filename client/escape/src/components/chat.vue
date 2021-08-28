@@ -6,10 +6,12 @@
         <h3>
             A fun, innocent little interactive Personality Test, through an Artifically Intelligent Agent
         </h3>
-        <h4>
-            DiabolicFlow sometimes makes use of either WhatsApp or SMS (Text) messaging to/from
+        <h3>
+            DiabolicFlow <b><font color="red">REQUIRES</font></b> use of either WhatsApp or SMS (Text, US only) messaging<br>&emsp; to/from
             the Cell Phone you indicate during the session.
-        </h4>
+            <h6>For completely innocent, benign purposes, I assure you...</h6>
+            You <b><font color="red">MUST</font></b> have this in order to continue.
+        </h3>
         <h2><i><b>Be sure to check your phone for messages!</b></i></h2>
         <div v-if="popped">
             <basic-vue-chat :title="'DiabolicFlow'" :new-message="message" @newOwnMessage="onNewOwnMessage" />
