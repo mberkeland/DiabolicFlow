@@ -198,7 +198,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
             if (number.length == 10) {
               number = "1" + number;
             }
-            if (number.charAt(0) == "1") { // Not a US number
+            if (useWA || (number.charAt(0) == "1")) { // No longer checking for a US number, IF WhatsApp is enabled a US number
               let num = "+" + number;
               let newnum = phoneUtil.parseAndKeepRawInput(num, "");
               if (phoneUtil.isValidNumber(newnum)) { // Cool! A valid number
@@ -367,6 +367,9 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
         break;
       case 'boom':
         sendSMS(user.id, "Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent!  Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom!");
+        setTimeout(() => {
+          users[user.id] = null;
+        }, 5000);
         break;
     }
     if (user && user.state) {

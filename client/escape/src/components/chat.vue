@@ -1,17 +1,20 @@
 <template lang="html">
 <section class="aChat">
-    <h2>DiabolicFlow</h2>
-    <h3>
-      A fun, innocent little interactive Personality Test, through an Artifically Intelligent Agent
-    </h3>
-    <h4>
-      DiabolicFlow sometimes makes use of either WhatsApp or SMS (Text) messaging to/from
-      the Cell Phone you indicate during the session.
-    </h4>
-    <h4>Be sure to check for messages!</h4>
-    <div v-if="popped">
-        <basic-vue-chat :title="'DiabolicFlow'" :new-message="message" @newOwnMessage="onNewOwnMessage" />
-    </div>
+    <div@click="firework=false">
+        <Firework v-if="firework" :boxHeight="'100%'" :boxWidth="'100%'" @click="firework=false" />
+        <h1>DiabolicFlow</h1>
+        <h3>
+            A fun, innocent little interactive Personality Test, through an Artifically Intelligent Agent
+        </h3>
+        <h4>
+            DiabolicFlow sometimes makes use of either WhatsApp or SMS (Text) messaging to/from
+            the Cell Phone you indicate during the session.
+        </h4>
+        <h2><i><b>Be sure to check your phone for messages!</b></i></h2>
+        <div v-if="popped">
+            <basic-vue-chat :title="'DiabolicFlow'" :new-message="message" @newOwnMessage="onNewOwnMessage" />
+        </div>
+        </div>
 </section>
 </template>
 
@@ -19,6 +22,8 @@
 import {
     FontAwesomeIcon
 } from '@fortawesome/vue-fontawesome';
+import swal from 'sweetalert2/dist/sweetalert2.all.min.js';
+import Firework from '@/components/fireworks.vue';
 
 //import BasicVueChat from "basic-vue-chat";
 import BasicVueChat from "basic-vue-chat";
@@ -28,6 +33,7 @@ export default {
     props: {},
     components: {
         "basic-vue-chat": BasicVueChat,
+        Firework,
     },
     data() {
         return {
@@ -40,6 +46,7 @@ export default {
             messageList: [],
             newMessagesCount: 0,
             isChatOpen: true,
+            firework: false,
         }
     },
     methods: {
@@ -64,6 +71,10 @@ export default {
                             contents: msg,
                             date: date,
                         };
+                        if (msg.startsWith('argh')) {
+                            console.log("Winner winner")
+                            this.firework = true;
+                        }
                     }
                 } else {
                     clearInterval(interval);
@@ -80,8 +91,17 @@ export default {
                 console.log("Result: ", result);
                 this.session = result.data.session;
                 this.addMessage(result.data.response);
+                if (result.data.response.startsWith('Thank you. Your user ID')) {
+                    this.popup();
+                }
+                if (result.data.response.startsWith('argh!')) {
+                    this.firework = true;
+                }
             })
         },
+        popup() {
+            this.$swal("Warning! Alert!", "DiabolicFlow has detected UNAUTHORIZED ACCESS to your cell phone by a hostile entity! Do NOT respond to any WhatsApp or Text Messages on your phone from unknown entities!", "warning");
+        }
     },
     created() {
         this.NODEDEMO = axios.create({
