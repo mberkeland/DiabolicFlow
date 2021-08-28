@@ -44,7 +44,9 @@ var vonage = new Vonage({
 vonage.account.updateSMSCallback(process.env.SMS_CALLBACK_URL + "/response", (err, result) => {
   console.log(result);
 });
-vonage.number.update("US", process.env.VIRTUAL_NUMBER, { "moHttpUrl": process.env.SMS_CALLBACK_URL + "/response", "voiceCallbackType": "app", "voiceCallbackValue": "https://mberkeland2.ngrok.io/answer" }, (err, result) => {
+vonage.number.update("US", process.env.VIRTUAL_NUMBER, {
+  "moHttpUrl": process.env.SMS_CALLBACK_URL + "/response", "voiceCallbackType": "app", "voiceCallbackValue": process.env.SMS_CALLBACK_URL + "/answer"
+}, (err, result) => {
   console.log(result);
 });
 
@@ -255,7 +257,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
             sendSMS(user.id, `I think I have a plan. It is monitoring us, so I can't just tell you; you'll have to figure it out.  I'll give you clues, but it is up to you to PUT IT ALL TOGETHER!`);
           }
           if (user.loop) { // Ok, send the clue after each pass through the questions
-            if (user.name.toLowerCase() != 'dale') {
+            if ((user.state > 0) && user.name.toLowerCase() != 'dale') {
               if ((user.prompts.name < 3) || (!(user.prompts.name % 10))) {
                 user.asked = 1;
                 let resp = await doIntent(user.session, "clue name");
@@ -281,7 +283,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
               sendSMS(user.id, "What a weird question. This thing is nefarious, do NOT trust it. We need to defeat it, somehow... But why an 'insect'?");
             }
           } else { // Ok, send the clue after each pass through the questions
-            if (user.fiction != "ant") {
+            if ((user.state > 0) && user.fiction != "ant") {
               user.prompts.fiction++;
               if (/* !user.asked */ (user.prompts.fiction == 1) || (!(user.prompts.fiction % 10))) {
                 let resp = await doIntent(user.session, "clue insect");
@@ -307,7 +309,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
               sendSMS(user.id, "Interesting. It wants to know a favorite activity.  Hmmm, we need to remember that.  'activity'...");
             }
           } else { // Ok, send the clue after each pass through the questions
-            if (user.activity != 'eat') {
+            if ((user.state > 0) && user.activity != 'eat') {
               user.prompts.activity++;
               if (/* !user.asked */ (user.prompts.activity == 1) || (!(user.prompts.activity % 10))) {
                 user.asked = 1;
@@ -327,7 +329,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
               sendSMS(user.id, "Most people would respond with their home state. We need to be careful. We need to keep track of what it is asking: 'state'");
             }
           } else { // Ok, send the clue after each pass through the questions
-            if (user.ustate != 'Maine') {
+            if ((user.state > 0) && user.ustate != 'Maine') {
               user.prompts.state++;
               if (/* !user.asked */ (user.prompts.state == 1) || (!(user.prompts.state % 4))) {
                 user.asked = 1;
@@ -346,7 +348,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
               sendSMS(user.id, "Limited people have access to this Agent, so your last name's initial might help it narrow you down. I hope you gave a false answer for the 'letter'");
             }
           } else { // Ok, send the clue after each pass through the questions
-            if (user.letter != 'h') {
+            if ((user.state > 0) && user.letter != 'h') {
               user.prompts.letter++;
               if (/* !user.asked */ (user.prompts.letter == 1) || (!(user.prompts.letter % 10))) {
                 user.asked = 1;

@@ -41,7 +41,7 @@ export default {
             NODEDEMO: {},
             popped: true,
             session: null,
-            nodeurl: "https://mberkeland2.ngrok.io",
+            nodeurl: "https://vids.vonage.com/escape",
             HTTP: null,
             messageList: [],
             newMessagesCount: 0,
@@ -104,6 +104,9 @@ export default {
         }
     },
     created() {
+        if(process.env.NODE_ENV === 'development') {
+            this.nodeurl = "https://mberkeland2.ngrok.io";
+        }
         this.NODEDEMO = axios.create({
             baseURL: this.nodeurl,
             headers: {
