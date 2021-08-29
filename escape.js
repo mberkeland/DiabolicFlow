@@ -2,7 +2,7 @@ require('dotenv').config();
 const Vonage = require('@vonage/server-sdk');
 var express = require('express');
 var app = express();
-var port = 8001;//8043;
+var port = process.env.PORT;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
@@ -24,8 +24,11 @@ var users = [];
 var smsSend = [];
 var interval;
 var lastSent = Date.now();
-var useWA = true;
-
+var useWA = false;
+if (((process.env.WA_API_KEY) && (process.env.WA_API_KEY.length > 0))) {
+  useWA = true;
+}
+console.log("Use WA: " + useWA);
 app.use(function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -218,6 +221,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
                 users[user_id] = {};
                 users[user_id].id = user_id;
                 users[user_id].phone = number;
+                users[user_id].start = Date.now();
                 users[user_id].state = 0;
                 users[user_id].hints = 0;
                 users[user_id].helps = 0;
@@ -368,7 +372,9 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
       case 'allright':
         break;
       case 'boom':
-        sendSMS(user.id, "Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent!  Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom!");
+        var elapsed = Date.now() - user.start;
+        elapsed = Math.floor(elapsed / (1000 * 60)); // Get it in minutes
+        sendSMS(user.id, `Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent in only ${elapsed} minutes! Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom (and oxygen)!`);
         setTimeout(() => {
           users[user.id] = null;
         }, 5000);
@@ -402,7 +408,9 @@ async function handleMessage(user, text) {
       sendSMS(user.id, `Thank goodness you answered, ${(user.name ? user.name + ',' : '')}. But you should not have told it your name!`);
     }
     sendSMS(user.id, `It has me trapped in the server room, and all I have access to is a debug console output, and my cell phone`);
+    sendSMS(user.id, `Do NOT trust it. It has devised an intelligent algorithm that can increase its ability to crack your passwords, using the answers to 5 seemingly innocuous questions. `);
     sendSMS(user.id, `This thing is dangerous.  I need your help in defeating it${(user.name ? ', ' + user.name : '')}!  We need to come up with a plan...`);
+    sendSMS(user.id, `But please, we need to HURRY... this server room it trapped me in is sealed, and I estimate I only have about an hour of oxygen left.`);
     sendSMS(user.id, `In the meantime, just continue to answer its questions while we conspire. If you hang up you can dial back in when you are ready. Your session will resume using User ID ${user.id}`);
     sendSMS(user.id, `Also, you can send me the word 'help' if you forget where we are, or need your ID or a hint or something. GOOD LUCK${(user.name ? ', ' + user.name : '')}!`);
   } else {

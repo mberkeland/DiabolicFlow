@@ -4,7 +4,7 @@
         <Firework v-if="firework" :boxHeight="'100%'" :boxWidth="'100%'" @click="firework=false" />
         <h1>DiabolicFlow</h1>
         <h3>
-            A fun, innocent little interactive Personality Test, through an Artifically Intelligent Agent
+            A fun, innocent little interactive Personality Test, through an Artificially Intelligent Agent
         </h3>
         <h3>
             DiabolicFlow <b><font color="red">REQUIRES</font></b> use of either WhatsApp or SMS (Text, US only) messaging<br>&emsp; to/from
