@@ -1,8 +1,11 @@
 # DiabolicFlow
 
-A DialogFlow CX project, submitted for the DialogFlow CX Competition, August 2021
+Welcome to DiabolicFlow, a simple, innocent little personality analyzer, with absolutely NO nefarious intentions whatsoever.
 
-DiabolicFlow is a DialogFlow CX-based "Escape Room" game.
+OR IS IT?????
+
+
+DiabolicFlow is a DialogFlow CX-based "Escape Room" game, submitted for the DialogFlow CX Competition, August 2021
 
 It consists of 2 independent (but interrelated) Agents, an App (handling webhooks and detectIntents), and a GUI component.
 
