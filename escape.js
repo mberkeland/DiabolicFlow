@@ -92,6 +92,22 @@ function sendSMS(id, message) {
   }
 }
 app.post('/hook2', async (req, res) => { // SMS Flow hook
+  var authheader = req.headers.authorization;
+
+  if (!authheader) {
+    console.log("No auth header, exit");
+    res.setHeader('WWW-Authenticate', 'Basic');
+    return res.status(401).end();
+  }
+
+  var auth = new Buffer.from(authheader.split(' ')[1], 'base64').toString().split(':');
+  var usern = auth[0];
+  var pass = auth[1];
+  if ((usern != "DiAbOlIc") || (pass != "fLoW")) {
+    console.log("Invalid auth header, exit");
+    res.setHeader('WWW-Authenticate', 'Basic');
+    return res.status(401).end();
+  }
   let tag = req.body.fulfillmentInfo.tag;
   console.log(`\n🚀 Received SMS Hook (tag= ${tag}): `, req.body);
   let response = {
@@ -104,7 +120,15 @@ app.post('/hook2', async (req, res) => { // SMS Flow hook
   let user = users.find((o) => {
     if (o && o.session && o.session == pieces[pieces.length - 1]) {
       console.log("Found SMS user: ", o);
-      response.sessionInfo.parameters = o;
+      response.sessionInfo.parameters = {
+        state: o.state,
+        hints: o.hint,
+        helps: o.helps,
+        asked: o.asked,
+        interactions: o.interactions,
+        loop: o.loop,
+        suspicion: o.suspicion,
+      };
       return o;
     }
   });
@@ -139,12 +163,31 @@ function checkState(id) {
       if (users[id].wa.use) {
         setupWa(id);
       }
-      sendSMS(id, "Hello?  Hello??? Are you there?  I am being held hostage by the DiabolicFlow AI, and I need HELP! Send me ANYTHING to let me know you are there!")
+      sendSMS(id, "Hello?  Hello??? Are you there?  I am being held hostage by the DiabolicFlow AI, and I need HELP!");
+      if (!user.wa.use) {
+        sendSMS(id, "Send me ANYTHING to let me know you are there!");
+      }
       return;
     }
   }
 }
 app.post('/hook1', async (req, res) => { // Main DF hook (voice)
+  var authheader = req.headers.authorization;
+
+  if (!authheader) {
+    console.log("No auth header, exit");
+    res.setHeader('WWW-Authenticate', 'Basic');
+    return res.status(401).end();
+  }
+
+  var auth = new Buffer.from(authheader.split(' ')[1], 'base64').toString().split(':');
+  var usern = auth[0];
+  var pass = auth[1];
+  if ((usern != "DiAbOlIc") || (pass != "fLoW")) {
+    console.log("Invalid auth header, exit");
+    res.setHeader('WWW-Authenticate', 'Basic');
+    return res.status(401).end();
+  }
   let tag = req.body.fulfillmentInfo.tag;
   console.log(`\n🚀 Received Hook (tag= ${tag}): `, req.body);
 
@@ -367,6 +410,9 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
         if (user) {
           user.loop++;
           user.asked = 0;
+          if ((user.loop > 3) && !(user.loop % 5)) {
+            sendSMS(user.id, "Remember, if you feel stuck, you can ask for a 'hint' at any time. Hopefully it won't notice.");
+          }
         }
         break;
       case 'allright':
@@ -377,7 +423,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
         sendSMS(user.id, `Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent in only ${elapsed} minutes! Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom (and oxygen)!`);
         setTimeout(() => {
           users[user.id] = null;
-        }, 5000);
+        }, 180000);
         break;
     }
     if (user && user.state) {
@@ -544,9 +590,12 @@ app.post('/wa_inbound', (req, res) => {
     return res.status(200).end();
   }
   users[id].wa.ok = true;
-  if (users[id].wa.messages.length) {
-    sendWA(id, "")
+  if (req.body.message && req.body.message.content.type == 'button') {
+    handleMessage(users[id], "");
   }
+  //  if (users[id].wa.messages.length) {
+  //    sendWA(id, "")
+  //  }
   if (req.body.message && req.body.message.content.type == 'text') {
     let text = req.body.message.content.text;
     handleMessage(users[id], text);
@@ -567,25 +616,30 @@ app.post('/wa_status', (req, res) => {
 })
 
 function sendWA(id, message) {
-  if (!users[id].wa.ok) {
+  if (message.length) {
     users[id].wa.messages.push(message);
-  } else {
+  }
+  if (users[id].wa.ok) {
     let obj = {
       content: {
         type: "text",
         text: ""
       }
     }
-    while (users[id].wa.messages.length) {
-      let msg = users[id].wa.messages.shift();
-      if (msg.length) {
-        obj.content.text = msg;
-        wa.wasend(users[id].phone, obj);
+    if (users[id].wa.messages.length) {
+      if (!users[id].interval) {
+        console.log("Creating users[id].interval");
+        users[id].interval = setInterval(() => {
+          if (users[id].wa.messages.length) {
+            let msg = users[id].wa.messages.shift();
+            obj.content.text = msg;
+            wa.wasend(users[id].phone, obj);
+          } else {
+            clearInterval(users[id].interval);
+            users[id].interval = null;
+          }
+        }, 6000);
       }
-    }
-    if (message.length) {
-      obj.content.text = message;
-      wa.wasend(users[id].phone, obj);
     }
   }
 }
