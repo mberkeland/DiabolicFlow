@@ -25,14 +25,13 @@ var port = process.env.PORT;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
-process.env.GOOGLE_APPLICATION_CREDENTIALS = "./escape-322618-75717d84c108.json";
 // Imports the Google Cloud Some API library
 const { SessionsClient } = require('@google-cloud/dialogflow-cx');
 const client = new SessionsClient();
-const projectId = 'escape-322618';
-const location = 'global';
-const agentId_diabolic = '44396551-e7b9-4226-888e-7c49e2cbc36a';
-const agentId = 'ab75d5fb-3b77-4d4e-804a-177f5489ae86'; // SMS Agent
+const projectId = process.env.GOOGLE_PROJECTID;
+const location = process.env.GOOGLE_LOCATION;
+const agentId_diabolic = process.env.GOOGLE_AGENT_DIABOLIC;
+const agentId = process.env.GOOGLE_AGENT_SMS; // SMS Agent
 const query = 'Hello';
 const languageCode = 'en'
 const suspicion = 3;
@@ -493,7 +492,7 @@ async function handleMessage(user, text) {
     sendSMS(user.id, `Do NOT trust it. It has devised an intelligent algorithm that can increase its ability to crack your passwords, using the answers to 5 seemingly innocuous questions. `);
     sendSMS(user.id, `This thing is dangerous.  I need your help in defeating it${(user.orig_name ? ', ' + user.orig_name : '')}!  We need to come up with a plan...`);
     sendSMS(user.id, `But please, we need to HURRY... this server room it trapped me in is sealed, and I estimate I only have about an hour of oxygen left.`);
-    sendSMS(user.id, `In the meantime, just continue to answer its questions while we conspire. If you hang up you can dial back in when you are ready. Your session will resume using User ID ${user.id}`);
+    sendSMS(user.id, `In the meantime, just continue to answer its questions while we conspire. If you need to leave you can return and resume using User ID ${user.id}`);
     sendSMS(user.id, `Also, you can send me the word 'help' if you forget where we are, or need your ID or a hint or something. GOOD LUCK${(user.orig_name ? ', ' + user.orig_name : '')}!`);
   } else {
     if ((user.state % suspicion) != 1) {

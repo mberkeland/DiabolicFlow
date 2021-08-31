@@ -49,7 +49,7 @@ class Whatsapp {
         }
     };
     async registerWA(number, url, type = 'incoming') {
-        request.post('https://vids.vonage.com/wa/register', {
+        request.post(process.env.REDIRECTOR + '/register', {
             headers: {
                 "content-type": "application/json",
             },
