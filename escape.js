@@ -267,7 +267,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
             }
           } else { // Must be phone, validate it.  FOR NOW, we support only US phones, so we can SMS.  Future: any country, WhatsApp
             if (number.length == 10) {
-              number = "1" + number;
+              //number = "1" + number;
             }
             if (useWA || (number.charAt(0) == "1")) { // No longer checking for a US number, IF WhatsApp is enabled a US number
               let num = "+" + number;
@@ -543,7 +543,7 @@ async function doIntent(sessionId, text) {
     console.log("SMS Intent Response: ", message)
     if (message.text) {
       console.log(`Agent Response: ${message.text.text}`);
-      resp += message.text.text + ". "
+      resp += message.text.text + " "
     }
   }
   console.log("SMS Intent full response: " + resp);
