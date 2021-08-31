@@ -622,7 +622,7 @@ wa.init();
 app.post('/wa_inbound', (req, res) => {
   console.log("WhatsApp Inbound: ", req.body);
   let id = req.query.uid;
-  if (id < 0 || (typeof users[id] === 'undefined')) {
+  if ((id < 0) || (typeof users[id] === 'undefined')) {
     return res.status(200).end();
   }
   users[id].wa.ok = true;
