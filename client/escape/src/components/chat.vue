@@ -7,10 +7,14 @@
             A fun, innocent little interactive Personality Test, through an Artificially Intelligent Agent
         </h3>
         <h3>
-            DiabolicFlow <b><font color="red">REQUIRES</font></b> use of either WhatsApp or SMS (Text, US only) messaging<br>&emsp; to/from
+            DiabolicFlow <b>
+                <font color="red">REQUIRES</font>
+            </b> use of either WhatsApp or SMS (Text, US only) messaging<br>&emsp; to/from
             the Cell Phone you indicate during the session.
             <h6>For completely innocent, benign purposes, I assure you...</h6>
-            You <b><font color="red">MUST</font></b> have this in order to continue.
+            You <b>
+                <font color="red">MUST</font>
+            </b> have this in order to continue.
         </h3>
         <h2><i><b>Be sure to check your phone for messages!</b></i></h2>
         <div v-if="popped">
@@ -49,6 +53,7 @@ export default {
             newMessagesCount: 0,
             isChatOpen: true,
             firework: false,
+            explosion: 0,
         }
     },
     methods: {
@@ -73,9 +78,12 @@ export default {
                             contents: msg,
                             date: date,
                         };
-                        if (msg.startsWith('argh')) {
+                        if (msg.startsWith('...Dale. Eat.')) { //'argh')) {
                             console.log("Winner winner")
                             this.firework = true;
+                            console.log("Playing explosion");
+                            var audio = new Audio('https://vids.vonage.com/pages/finalsystemfail.mp3');
+                            audio.play();
                         }
                     }
                 } else {
@@ -99,14 +107,14 @@ export default {
                 if (result.data.response.startsWith('argh!')) {
                     this.firework = true;
                 }
-            })
+            });
         },
         popup() {
             this.$swal("Warning! Alert!", "DiabolicFlow has detected UNAUTHORIZED ACCESS to your cell phone by a hostile entity! Do NOT respond to any WhatsApp or Text Messages on your phone from unknown entities!", "warning");
         }
     },
     created() {
-        if(process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === 'development') {
             this.nodeurl = "https://mberkeland2.ngrok.io";
         }
         this.NODEDEMO = axios.create({
