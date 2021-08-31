@@ -147,6 +147,7 @@ app.post('/hook2', async (req, res) => { // SMS Flow hook
         interactions: o.interactions,
         loop: o.loop,
         suspicion: o.suspicion,
+        orig_name: o.orig_name,
       };
       return o;
     }
@@ -166,6 +167,10 @@ app.post('/hook2', async (req, res) => { // SMS Flow hook
         case 'reset':
           if (user && user.id) {
             sendSMS(user.id, "Session is now reset");
+            if (user.interval) {
+              clearInterval(user.interval);
+              user.interval = null;
+            }
             user = null;
           }
           console.log("Session reset");
@@ -276,6 +281,10 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
                   }
                 });
                 if (user) {
+                  if (user.interval) {
+                    clearInterval(user.interval);
+                    user.interval = null;
+                  }
                   user = null;
                 }
                 let user_id = base_id++;
@@ -291,6 +300,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
                 users[user_id].asked = 0;
                 users[user_id].loop = 0;
                 users[user_id].suspicion = 0;
+                users[user_id].orig_name = '';
                 users[user_id].wa = {
                   use: useWA,
                   ok: false,
@@ -312,6 +322,9 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
       case 'name':
         if (user) {
           user.name = req.body.sessionInfo.parameters.name.name;
+          if (!user.orig_name.length) {
+            user.orig_name = user.name;
+          }
           user.prompts.name++;
           if (user.loop < 1) {
             if (user.interactions) {
@@ -319,7 +332,7 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
             }
           }
           if (user.loop == 1) {
-            sendSMS(user.id, `It already asked for your name, ${user.name}.  It wants to get as much info about you as it can, but it suspects something is wrong. We can use this to our advantage! `);
+            sendSMS(user.id, `It already asked for your name, ${user.orig_name}.  It wants to get as much info about you as it can, but it suspects something is wrong. We can use this to our advantage! `);
             sendSMS(user.id, `I think I have a plan. It is monitoring us, so I can't just tell you; you'll have to figure it out.  I'll give you clues, but it is up to you to PUT IT ALL TOGETHER!`);
           }
           if (user.loop) { // Ok, send the clue after each pass through the questions
@@ -439,8 +452,12 @@ app.post('/hook1', async (req, res) => { // Main DF hook (voice)
       case 'boom':
         var elapsed = Date.now() - user.start;
         elapsed = Math.floor(elapsed / (1000 * 60)); // Get it in minutes
-        sendSMS(user.id, `Woohoo!!!! You DID IT!  You DEFEATED the evil DiabolicFlow Agent in only ${elapsed} minutes! Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom (and oxygen)!`);
+        sendSMS(user.id, `Woohoo!!!! You DID IT, ${user.orig_name}!  You DEFEATED the evil DiabolicFlow Agent in only ${elapsed} minutes! Thank you! I can hear the doors to the server room unlocking now, and I once again have my freedom (and oxygen)!`);
         setTimeout(() => {
+          if (users[user.id].interval) {
+            clearInterval(users[user.id].interval);
+            user.users[user.id] = null;
+          }
           users[user.id] = null;
         }, 180000);
         break;
@@ -470,14 +487,14 @@ async function handleMessage(user, text) {
     if (!user.name) {
       sendSMS(user.id, `Thank goodness you answered!  Whatever you do, DO NOT tell it your real NAME! Make something up.`);
     } else {
-      sendSMS(user.id, `Thank goodness you answered, ${(user.name ? user.name + ',' : '')}. But you should not have told it your name!`);
+      sendSMS(user.id, `Thank goodness you answered, ${(user.orig_name ? user.orig_name + ',' : '')}. But you should not have told it your name!`);
     }
     sendSMS(user.id, `It has me trapped in the server room, and all I have access to is a debug console output, and my cell phone`);
     sendSMS(user.id, `Do NOT trust it. It has devised an intelligent algorithm that can increase its ability to crack your passwords, using the answers to 5 seemingly innocuous questions. `);
-    sendSMS(user.id, `This thing is dangerous.  I need your help in defeating it${(user.name ? ', ' + user.name : '')}!  We need to come up with a plan...`);
+    sendSMS(user.id, `This thing is dangerous.  I need your help in defeating it${(user.orig_name ? ', ' + user.orig_name : '')}!  We need to come up with a plan...`);
     sendSMS(user.id, `But please, we need to HURRY... this server room it trapped me in is sealed, and I estimate I only have about an hour of oxygen left.`);
     sendSMS(user.id, `In the meantime, just continue to answer its questions while we conspire. If you hang up you can dial back in when you are ready. Your session will resume using User ID ${user.id}`);
-    sendSMS(user.id, `Also, you can send me the word 'help' if you forget where we are, or need your ID or a hint or something. GOOD LUCK${(user.name ? ', ' + user.name : '')}!`);
+    sendSMS(user.id, `Also, you can send me the word 'help' if you forget where we are, or need your ID or a hint or something. GOOD LUCK${(user.orig_name ? ', ' + user.orig_name : '')}!`);
   } else {
     if ((user.state % suspicion) != 1) {
       user.state++;
@@ -649,7 +666,7 @@ function sendWA(id, message) {
       if (!users[id].interval) {
         console.log("Creating users[id].interval");
         users[id].interval = setInterval(() => {
-          if (users[id].wa.messages.length) {
+          if (users[id] && users[id].wa.messages.length) {
             let msg = users[id].wa.messages.shift();
             obj.content.text = msg;
             wa.wasend(users[id].phone, obj);
@@ -657,7 +674,7 @@ function sendWA(id, message) {
             clearInterval(users[id].interval);
             users[id].interval = null;
           }
-        }, 6000);
+        }, 4000);
       }
     }
   }
